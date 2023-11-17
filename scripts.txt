@@ -1,0 +1,1 @@
+for i in {1..100}; do ./client 30000 1000000000 & > /dev/null; done

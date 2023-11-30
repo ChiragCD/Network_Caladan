@@ -3,7 +3,9 @@ LD = gcc
 RUNTIME_LIBS = $(ROOT_PATH)/libruntime.a $(ROOT_PATH)/libnet.a \
 	       $(ROOT_PATH)/libbase.a -lpthread
 
-RUNTIME_DEPS = $(ROOT_PATH)/libruntime.a $(ROOT_PATH)/libnet.a \
+RUNTIME_DEPS = $(ROOT_PATH)/libruntime.a $(ROOT_PATH)/libnet.a 
+LDFLAGS = -T $(ROOT_PATH)/base/base.ld
+
 
 ROOT_PATH=../..
 
@@ -19,5 +21,3 @@ combined: combined.o $(RUNTIME_DEPS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INC) -c $< -o $@
-
-

@@ -110,19 +110,34 @@ static void do_client(void *arg)
 	log_info("measured %f reqs/s", (double)reqs / seconds);
 }
 
+double calc_pi(uint64_t num_terms) {
+    double pi = 0.0;
+    int64_t denominator = 1;
+    int64_t sign = 1;
+    for(uint64_t i = 0; i < num_terms; i++) {
+        pi += sign * (double) 4 / denominator;
+        denominator += 2;
+        sign *= -1;
+    }
+    return pi;
+}
+
 static void server_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];
 	tcpconn_t *c = (tcpconn_t *)arg;
 	ssize_t ret;
 
-	/* echo the data back */
+	/* calculate pi and return it */
 	while (true) {
 		ret = tcp_read(c, buf, BUF_SIZE);
 		if (ret <= 0)
 			break;
+		
+		uint64_t num_terms = *(uint64_t *)buf;
+		double result = calc_pi(num_terms);
 
-		ret = tcp_write(c, buf, ret);
+		ret = tcp_write(c, &result, sizeof(double));
 		if (ret < 0)
 			break;
 	}

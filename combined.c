@@ -12,7 +12,6 @@
 #include <net/ip.h>
 #include <runtime/runtime.h>
 #include <runtime/sync.h>
-#include <runtime/tcp.h>
 #include <runtime/udp.h>
 
 #define NETPERF_PORT	8000
@@ -49,7 +48,7 @@ static void client_worker(void *arg)
 
 	ret = udp_dial(laddr, raddr, &c);
 	if (ret) {
-		log_err("tcp_dial() failed, ret = %ld", ret);
+		log_err("udp_dial() failed, ret = %ld", ret);
 		goto done;
 	}
 
@@ -69,7 +68,6 @@ static void client_worker(void *arg)
 			log_err("udp_read() failed, ret = %ld", ret);
 			break;
 		}
-	printf("Hi %f!\n", ((double *)buf)[0]);
 
 		budget += ret / payload_len;
 		args->reqs += ret / payload_len;
@@ -89,7 +87,7 @@ static void do_client(void *arg)
 	int i, ret;
 	uint64_t reqs = 0;
 
-	log_info("client-mode TCP: %d workers, %ld bytes, %d seconds %d depth",
+	log_info("client-mode UDP: %d workers, %ld bytes, %d seconds %d depth",
 		 nworkers, payload_len, seconds, depth);
 
 	arg_tbl = calloc(nworkers, sizeof(*arg_tbl));
@@ -125,49 +123,28 @@ double calc_pi(uint64_t num_terms) {
     return pi;
 }
 
-static void server_worker(void *arg)
+static void server_worker(struct udp_spawn_data * arg)
 {
-	unsigned char buf[BUF_SIZE];
-	tcpconn_t *c = (tcpconn_t *)arg;
-	ssize_t ret;
-
 	/* calculate pi and return it */
-	while (true) {
-		ret = tcp_read(c, buf, BUF_SIZE);
-		if (ret <= 0)
-			break;
 		
-		uint64_t num_terms = *(uint64_t *)buf;
+		uint64_t num_terms = *(uint64_t *)arg->buf;
 		double result = calc_pi(num_terms);
-
-		ret = tcp_write(c, &result, sizeof(double));
-		if (ret < 0)
-			break;
-	}
-
-	tcp_close(c);
+		ssize_t ret = udp_send(&result, sizeof(double), arg->laddr, arg->raddr);
 }
 
 static void do_server(void *arg)
 {
 	struct netaddr laddr;
-	tcpqueue_t *q;
 	int ret;
 
 	laddr.ip = 0;
 	laddr.port = NETPERF_PORT;
 
-	ret = tcp_listen(laddr, 4096, &q);
-	BUG_ON(ret);
+	udpspawner_t * spawner;
 
-	while (true) {
-		tcpconn_t *c;
-
-		ret = tcp_accept(q, &c);
+		ret = udp_create_spawner(laddr, server_worker, &spawner);
 		BUG_ON(ret);
-		ret = thread_spawn(server_worker, c);
-		BUG_ON(ret);
-	}
+	while(1);
 }
 
 static int str_to_ip(const char *str, uint32_t *addr)

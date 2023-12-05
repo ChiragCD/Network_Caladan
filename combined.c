@@ -13,6 +13,7 @@
 #include <runtime/runtime.h>
 #include <runtime/sync.h>
 #include <runtime/tcp.h>
+#include <runtime/udp.h>
 
 #define NETPERF_PORT	8000
 
@@ -35,7 +36,7 @@ static void client_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];
 	struct client_rr_args *args = (struct client_rr_args *)arg;
-	tcpconn_t *c;
+	udpconn_t *c;
 	struct netaddr laddr;
 	ssize_t ret;
 	int budget = depth;
@@ -46,7 +47,7 @@ static void client_worker(void *arg)
 
 	memset(buf, 0xAB, payload_len);
 
-	ret = tcp_dial(laddr, raddr, &c);
+	ret = udp_dial(laddr, raddr, &c);
 	if (ret) {
 		log_err("tcp_dial() failed, ret = %ld", ret);
 		goto done;
@@ -54,27 +55,29 @@ static void client_worker(void *arg)
 
 	while (microtime() < stop_us) {
 		while (budget) {
-			ret = tcp_write(c, buf, payload_len);
+			((uint64_t *)buf)[0] = 40;
+			ret = udp_write(c, buf, payload_len);
 			if (ret != payload_len) {
-				log_err("tcp_write() failed, ret = %ld", ret);
+				log_err("udp_write() failed, ret = %ld", ret);
 				break;
 			}
 			budget--;
 		}
 
-		ret = tcp_read(c, buf, payload_len * depth);
+		ret = udp_read(c, buf, payload_len * depth);
 		if (ret <= 0 || ret % payload_len != 0) {
-			log_err("tcp_read() failed, ret = %ld", ret);
+			log_err("udp_read() failed, ret = %ld", ret);
 			break;
 		}
+	printf("Hi %f!\n", ((double *)buf)[0]);
 
 		budget += ret / payload_len;
 		args->reqs += ret / payload_len;
 	}
 
-	log_info("close port %hu", tcp_local_addr(c).port);
-	tcp_abort(c);
-	tcp_close(c);
+	log_info("close port %hu", udp_local_addr(c).port);
+	udp_shutdown(c);
+	udp_close(c);
 done:
 	waitgroup_done(args->wg);
 }

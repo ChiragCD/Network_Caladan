@@ -47,7 +47,7 @@ static void client_worker(void *arg)
 
 	ret = udp_dial(laddr, raddr, &c);
 	if (ret) {
-		log_err("udp_dial() failed, ret = %ld", ret);
+		printf("udp_dial() failed, ret = %ld\n", ret);
 		goto done;
 	}
 
@@ -55,20 +55,20 @@ static void client_worker(void *arg)
         ((uint64_t *)buf)[0] = 400;
         ret = udp_write(c, buf, payload_len);
         if (ret != payload_len) {
-            log_err("udp_write() failed, ret = %ld", ret);
+            printf("udp_write() failed, ret = %ld\n", ret);
             break;
         }
 
 		ret = udp_read(c, buf, payload_len * depth);
 		if (ret <= 0 || ret % payload_len != 0) {
-			log_err("udp_read() failed, ret = %ld", ret);
+			printf("udp_read() failed, ret = %ld\n", ret);
 			break;
 		}
 
 		args->reqs++;
 	}
 
-	log_info("close port %hu", udp_local_addr(c).port);
+	printf("close port %hu\n", udp_local_addr(c).port);
 	udp_shutdown(c);
 	udp_close(c);
 done:
@@ -82,7 +82,7 @@ static void do_client(void *arg)
 	int i, ret;
 	uint64_t reqs = 0;
 
-	log_info("client-mode UDP: %d workers, %ld bytes, %d seconds %d depth",
+	printf("client-mode UDP: %d workers, %ld bytes, %d seconds %d depth\n",
 		 nworkers, payload_len, seconds, depth);
 
 	arg_tbl = calloc(nworkers, sizeof(*arg_tbl));
@@ -103,7 +103,7 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++)
 		reqs += arg_tbl[i].reqs;
 
-	log_info("measured %f reqs/s", (double)reqs / seconds);
+	printf("measured %f reqs/s\n", (double)reqs / seconds);
 }
 
 double calc_pi(uint64_t num_terms) {

@@ -4,7 +4,8 @@
 #include <stdint.h>                                                                                                                                           
 #include <unistd.h>                                                                                                                                           
 #include <sys/socket.h>                                                                                                                                       
-#include <arpa/inet.h>                                                                                                                                        
+#include <arpa/inet.h>   
+#include <time.h>                                                                                                                                     
                                                                                                                                                               
 #define BUF_LEN 100                                                                                                                                           
                                                                                                                                                               
@@ -40,13 +41,20 @@ int main(int argc, char * argv[]) {
     remote_addr.sin_port = htons(8000); 
 
     uint64_t buffer[BUF_LEN];
+    int priority = 5;
     buffer[0] = num_terms;
-    buffer[3] = 5;
+    buffer[3] = priority;
+    struct timeval t1, t2;
+    gettimeofday(&t1,NULL);
     int size = sendto(sock, buffer, BUF_LEN*sizeof(uint64_t), 0, (struct sockaddr *) &remote_addr, sizeof(remote_addr));
 
     int remote_addr_len = 0;
     size = recvfrom(sock, buffer, BUF_LEN*sizeof(uint64_t), 0, (struct sockaddr *) &remote_addr, &remote_addr_len);
-    //printf("Received %.20f\n", ((double *) buffer)[0]);
+    gettimeofday(&t2,NULL);
+
+    unsigned long time1 = t1.tv_sec * 1000000 + t1.tv_usec;
+    unsigned long time2 = t2.tv_sec * 1000000 + t2.tv_usec;
+    printf("%d %lu %lu\n", priority, time1, time2);
     terminate();
     return 0;
 }

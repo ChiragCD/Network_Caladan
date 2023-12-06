@@ -101,6 +101,7 @@ static void client_worker(void *arg)
         ((uint64_t *)buf)[0] = 400;
         ((uint64_t *)buf)[1] = args->reqs;
         ((uint64_t *)buf)[2] = args->id;
+        ((uint64_t *)buf)[3] = args->id;
 		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
         ret = udp_write(args->c, buf, payload_len);
@@ -186,6 +187,7 @@ static void server_worker(struct udp_spawn_data * arg)
     uint64_t num_terms = *(uint64_t *)arg->buf;
     double pi = calc_pi(num_terms);
     ((uint64_t *)arg->buf)[0] = *(uint64_t *)(&pi);
+    ((uint64_t *)arg->buf)[3] = 0;
     ssize_t ret = udp_send(arg->buf, payload_len, arg->laddr, arg->raddr);
 }
 

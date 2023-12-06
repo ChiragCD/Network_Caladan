@@ -48,19 +48,6 @@ void handle_interrupt(int signal) {
     terminate();
 }
 
-static void client_receiver(void * arg) {
-
-	while (microtime() < stop_us + 10000) {
-		ssize_t ret = udp_read(c, buf, payload_len);
-        uint64_t request_number = ((uint64_t *)buf)[1];
-		args->ends[request_number] = microtime();
-		if (ret <= 0 || ret % payload_len != 0) {
-			printf("udp_read() failed, ret = %ld\n", ret);
-			break;
-		}
-	}
-}
-
 static void client_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];

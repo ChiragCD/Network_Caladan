@@ -45,7 +45,7 @@ void terminate() {
     printf("\nTerminating\n");
     FILE * file = fopen("out", "w");
     for(int i = 0; i < nworkers; i++) {
-        for(int j = 0; j < arg_tbl[i].reqs) {
+        for(int j = 0; j < arg_tbl[i].reqs; j++) {
             uint64_t start = arg_tbl[i].starts[j];
             uint64_t end = arg_tbl[i].ends[j];
             uint64_t latency = 0;

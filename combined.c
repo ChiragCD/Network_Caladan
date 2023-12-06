@@ -83,7 +83,7 @@ static void client_receiver(void * arg) {
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);
-	// waitgroup_done(args->wg);
+	waitgroup_done(args->wg);
 }
 
 static void client_worker(void *arg)
@@ -112,7 +112,7 @@ static void client_worker(void *arg)
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);
-	// waitgroup_done(args->wg);
+	waitgroup_done(args->wg);
 }
 
 static void do_client(void *arg)
@@ -146,9 +146,7 @@ static void do_client(void *arg)
 		arg_tbl[i].reqs = 0;
         arg_tbl[i].id = i;
 		if(i%2 == 0) {
-            int tid;
-            pthread_create(&tid, NULL, client_worker, (void *) &arg_tbl[i]);
-            // ret = thread_spawn(client_worker, &arg_tbl[i]);
+            ret = thread_spawn(client_worker, &arg_tbl[i]);
         }
         else {
             ret = thread_spawn(client_receiver, &arg_tbl[i]);

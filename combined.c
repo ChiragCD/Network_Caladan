@@ -3,6 +3,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <signal.h>
@@ -26,6 +27,7 @@ static int seconds;
 static uint64_t stop_us;
 static size_t payload_len;
 static int depth;
+static struct client_rr_args *arg_tbl;
 
 pthread_mutex_t server_lock;
 
@@ -41,6 +43,17 @@ struct client_rr_args {
 
 void terminate() {
     printf("\nTerminating\n");
+    FILE * file = fopen("out", "w");
+    for(int i = 0; i < nworkers; i++) {
+        for(int j = 0; j < arg_tbl[i].reqs) {
+            uint64_t start = arg_tbl[i].starts[j];
+            uint64_t end = arg_tbl[i].ends[j];
+            uint64_t latency = 0;
+            if(end) latency = end - start;
+            fprintf(file, "%d %d %ld %ld %ld\n", i, j, start, end, latency);
+        }
+    }
+    fclose(file);
     exit(0);
 }
 
@@ -54,6 +67,8 @@ static void client_worker(void *arg)
 	struct client_rr_args *args = (struct client_rr_args *)arg;
     args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     args->ends = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    memset(args->starts, 0, 100000 * sizeof(uint64_t));
+    memset(args->ends, 0, 100000 * sizeof(uint64_t));
 	udpconn_t *c;
 	struct netaddr laddr;
 	ssize_t ret;
@@ -109,7 +124,6 @@ done:
 static void do_client(void *arg)
 {
 	waitgroup_t wg;
-	struct client_rr_args *arg_tbl;
 	int i, ret;
 	uint64_t reqs = 0;
 

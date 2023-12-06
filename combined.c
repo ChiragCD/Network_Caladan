@@ -144,6 +144,9 @@ static void do_client(void *arg)
         printf("udp_dial() failed, ret = %d\n", ret);
         return;
     }
+    arg_tbl[0].ends = (uint64_t **) malloc(nworkers * sizeof(uint64_t *));
+    for(int i = 0; i < nworkers; i++) arg_tbl[0].ends[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    for(int i = 0; i < nworkers; i++) memset(arg_tbl[0].ends[i], 0, 100000 * sizeof(uint64_t));
 	for (i = 0; i < nworkers; i++) {
         arg_tbl[i].c = c;
 		arg_tbl[i].wg = &wg;
@@ -153,10 +156,15 @@ static void do_client(void *arg)
             ret = thread_spawn(client_worker, &arg_tbl[i]);
         }
         else {
-            ret = thread_spawn(client_receiver, &arg_tbl[i]);
+            // ret = thread_spawn(client_receiver, &arg_tbl[i]);
         }
 		BUG_ON(ret);
 	}
+
+	udpspawner_t * spawner;
+
+    ret = udp_create_spawner(laddr, par_client_receiver, &spawner);
+    BUG_ON(ret);
 
 	waitgroup_wait(&wg);
     udp_shutdown(arg_tbl[0].c);
@@ -169,6 +177,12 @@ static void do_client(void *arg)
 
 	printf("measured %f reqs/s\n", (double)reqs / seconds);
     terminate();
+}
+
+void par_client_receiver(struct udp_spawn_data * arg) {
+    uint64_t request_number = ((uint64_t *)arg->buf)[1];
+    uint64_t id = ((uint64_t *)arg->buf)[2];
+    arg_tbl[0]->ends[id][request_number] = microtime();
 }
 
 double calc_pi(uint64_t num_terms) {

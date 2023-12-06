@@ -124,11 +124,11 @@ static void do_client(void *arg)
         struct netaddr laddr;
         laddr.ip = 0;
         laddr.port = 0;
-        if (udp_dial(laddr, raddr, &c)) {
+        if (ssize_t ret = udp_dial(laddr, raddr, &c)) {
             printf("udp_dial() failed, ret = %ld\n", ret);
             return;
         }
-        arg_tbl[i].c = &c;
+        arg_tbl[i].c = c;
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
         arg_tbl[i].id = i;

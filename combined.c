@@ -80,14 +80,10 @@ static void client_receiver(void * arg) {
             uint64_t request_number = ((uint64_t *)buf)[1];
             args->ends[request_number] = microtime();
         }
-
-        t1.tv_sec = 0;
-        t1.tv_nsec = 1000 * 1000 * 50;
-        nanosleep(&t1, &t2);
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);
-	waitgroup_done(args->wg);
+	// waitgroup_done(args->wg);
 }
 
 static void client_worker(void *arg)
@@ -116,7 +112,7 @@ static void client_worker(void *arg)
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);
-	waitgroup_done(args->wg);
+	// waitgroup_done(args->wg);
 }
 
 static void do_client(void *arg)
@@ -149,8 +145,14 @@ static void do_client(void *arg)
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
         arg_tbl[i].id = i;
-		if(i%2 == 0) ret = thread_spawn(client_worker, &arg_tbl[i]);
-        else ret = thread_spawn(client_receiver, &arg_tbl[i]);
+		if(i%2 == 0) {
+            int tid;
+            pthread_create(&tid, NULL, client_worker, (void *) &arg_tbl[i]);
+            // ret = thread_spawn(client_worker, &arg_tbl[i]);
+        }
+        else {
+            ret = thread_spawn(client_receiver, &arg_tbl[i]);
+        }
 		BUG_ON(ret);
 	}
 

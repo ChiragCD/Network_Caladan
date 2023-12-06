@@ -77,7 +77,7 @@ static void client_worker(void *arg)
 		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
         ret = udp_write(c, buf, payload_len);
-        if (ret != payload_len) {
+        if (ret != -11 && (ret != payload_len)) {
             printf("udp_write() failed, ret = %ld\n", ret);
             break;
         }

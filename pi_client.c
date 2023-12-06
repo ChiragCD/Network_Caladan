@@ -55,7 +55,9 @@ int main(int argc, char * argv[]) {
 
     unsigned long time1 = t1.tv_sec * 1000000 + t1.tv_usec;
     unsigned long time2 = t2.tv_sec * 1000000 + t2.tv_usec;
-    printf("%d %lu %lu\n", priority, time1, time2 - time1);
+    FILE * f = fopen("out", "r");
+    fprintf(f, "%d %lu %lu\n", priority, time1, time2 - time1);
+    fclose(f);
     terminate();
     return 0;
 }

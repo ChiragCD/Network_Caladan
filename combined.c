@@ -85,7 +85,7 @@ static void client_worker(void *arg)
 		ret = udp_read(c, buf, payload_len);
         uint64_t request_number = ((uint64_t *)buf)[1];
 		args->ends[request_number] = microtime();
-		if (ret <= 0 || ret % payload_len != 0) {
+		if (ret != -11 && (ret <= 0 || ret % payload_len != 0)) {
 			printf("udp_read() failed, ret = %ld\n", ret);
 			break;
 		}

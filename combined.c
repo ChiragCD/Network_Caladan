@@ -38,7 +38,6 @@ static void client_worker(void *arg)
 	udpconn_t *c;
 	struct netaddr laddr;
 	ssize_t ret;
-	int budget = depth;
 
 	/* local IP + ephemeral port */
 	laddr.ip = 0;
@@ -53,15 +52,12 @@ static void client_worker(void *arg)
 	}
 
 	while (microtime() < stop_us) {
-		while (budget) {
-			((uint64_t *)buf)[0] = 40;
-			ret = udp_write(c, buf, payload_len);
-			if (ret != payload_len) {
-				log_err("udp_write() failed, ret = %ld", ret);
-				break;
-			}
-			budget--;
-		}
+        ((uint64_t *)buf)[0] = 400;
+        ret = udp_write(c, buf, payload_len);
+        if (ret != payload_len) {
+            log_err("udp_write() failed, ret = %ld", ret);
+            break;
+        }
 
 		ret = udp_read(c, buf, payload_len * depth);
 		if (ret <= 0 || ret % payload_len != 0) {
@@ -69,8 +65,7 @@ static void client_worker(void *arg)
 			break;
 		}
 
-		budget += ret / payload_len;
-		args->reqs += ret / payload_len;
+		args->reqs++;
 	}
 
 	log_info("close port %hu", udp_local_addr(c).port);

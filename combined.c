@@ -29,6 +29,7 @@ static int depth;
 struct client_rr_args {
 	waitgroup_t *wg;
 	uint64_t reqs;
+    uint64_t id;
 };
 
 static void client_worker(void *arg)
@@ -53,6 +54,7 @@ static void client_worker(void *arg)
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 400;
+        ((uint64_t *)buf)[3] = args->id;
         ret = udp_write(c, buf, payload_len);
         if (ret != payload_len) {
             printf("udp_write() failed, ret = %ld\n", ret);
@@ -94,6 +96,7 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++) {
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
+		arg_tbl[i].id = id;
 		ret = thread_spawn(client_worker, &arg_tbl[i]);
 		BUG_ON(ret);
 	}
@@ -124,7 +127,9 @@ static void server_worker(struct udp_spawn_data * arg)
 		
 		uint64_t num_terms = *(uint64_t *)arg->buf;
 		double result = calc_pi(num_terms);
-		ssize_t ret = udp_send(&result, sizeof(double), arg->laddr, arg->raddr);
+        ((uint64_t *)arg->buf)[0] = *((uint64_t *)(&result));
+        ((uint64_t *)arg->buf)[3] = 1;
+		ssize_t ret = udp_send(&result, payload_len, arg->laddr, arg->raddr);
 }
 
 static void do_server(void *arg)

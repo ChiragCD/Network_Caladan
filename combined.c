@@ -20,6 +20,8 @@
 
 #define NETPERF_PORT	8000
 
+const long NS_PER_S = 1000000000;
+
 /* experiment parameters */
 static struct netaddr raddr;
 static int nworkers;
@@ -35,11 +37,13 @@ pthread_mutex_t server_lock;
 
 struct client_rr_args {
     int id;
-	waitgroup_t *wg;
+    waitgroup_t *wg;
     uint64_t * starts;
     uint64_t ** ends;
-	uint64_t reqs;
+    uint64_t reqs;
     udpconn_t * c;
+    // packet rate in packets per second
+    uint64_t packet_rate;
     struct netaddr laddr;
 };
 
@@ -93,30 +97,31 @@ static void client_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];
 	struct client_rr_args *args = (struct client_rr_args *)arg;
-    args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
-    memset(args->starts, 0, 100000 * sizeof(uint64_t));
-    struct timespec t1, t2;
-    int ret;
+	args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+	memset(args->starts, 0, 100000 * sizeof(uint64_t));
+	long ns_per_packet = NS_PER_S / args->packet_rate;
+	struct timespec t1, t2;
+	int ret;
 
 	while (microtime() < stop_us) {
-        ((uint64_t *)buf)[0] = 400;
-        ((uint64_t *)buf)[1] = args->reqs;
-        ((uint64_t *)buf)[2] = args->id;
-        ((uint64_t *)buf)[3] = args->id;
+		((uint64_t *)buf)[0] = 400;
+		((uint64_t *)buf)[1] = args->reqs;
+		((uint64_t *)buf)[2] = args->id;
+		((uint64_t *)buf)[3] = args->id;
 		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
-        ret = udp_send(buf, payload_len, args->laddr, raddr);
-        // ret = udp_write(args->c, buf, payload_len);
-        if (ret != -11 && (ret != payload_len)) {
-            printf("udp_write() failed, ret = %d\n", ret);
-            break;
-        }
+		ret = udp_send(buf, payload_len, args->laddr, raddr);
+		// ret = udp_write(args->c, buf, payload_len);
+		if (ret != -11 && (ret != payload_len)) {
+			printf("udp_write() failed, ret = %d\n", ret);
+			break;
+		}
 
-        t1.tv_sec = 0;
-        t1.tv_nsec = 1000 * 1000 * 50;
-        while(nanosleep(&t1, &t2)) {
-            t1.tv_nsec = t2.tv_nsec;
-        }
+		t1.tv_sec = 0;
+		t1.tv_nsec = ns_per_packet;
+		while(nanosleep(&t1, &t2)) {
+			t1.tv_nsec = t2.tv_nsec;
+		}
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);
@@ -162,31 +167,32 @@ static void do_client(void *arg)
     arg_tbl[0].ends = (uint64_t **) malloc(nworkers * sizeof(uint64_t *));
     for(int i = 0; i < nworkers; i++) arg_tbl[0].ends[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     for(int i = 0; i < nworkers; i++) memset(arg_tbl[0].ends[i], 0, 100000 * sizeof(uint64_t));
-	for (i = 0; i < nworkers; i++) {
-        arg_tbl[i].c = c;
-		arg_tbl[i].wg = &wg;
-		arg_tbl[i].reqs = 0;
-        arg_tbl[i].id = i;
-        arg_tbl[i].l = laddr;
-		if(i) {
-            ret = thread_spawn(client_worker, &arg_tbl[i]);
-        }
-        else {
-            // ret = thread_spawn(client_receiver, &arg_tbl[i]);
-        }
-		BUG_ON(ret);
-	}
+    for (i = 0; i < nworkers; i++) {
+	    arg_tbl[i].c = c;
+	    arg_tbl[i].wg = &wg;
+	    arg_tbl[i].reqs = 0;
+	    arg_tbl[i].id = i;
+	    arg_tbl[i].laddr = laddr;
+	    arg_tbl[i].packet_rate = 50 * 1000 * 1000;
+	    if(i) {
+		    ret = thread_spawn(client_worker, &arg_tbl[i]);
+	    }
+	    else {
+		    // ret = thread_spawn(client_receiver, &arg_tbl[i]);
+	    }
+	    BUG_ON(ret);
+    }
 
-	waitgroup_wait(&wg);
+    waitgroup_wait(&wg);
     udp_shutdown(arg_tbl[0].c);
     udp_close(arg_tbl[0].c);
 
-	for (i = 0; i < nworkers; i++) {
-        printf("%d made %ld reqs\n", i, arg_tbl[i].reqs);
-        reqs += arg_tbl[i].reqs;
+    for (i = 0; i < nworkers; i++) {
+	    printf("%d made %ld reqs\n", i, arg_tbl[i].reqs);
+	    reqs += arg_tbl[i].reqs;
     }
 
-	printf("measured %f reqs/s\n", (double)reqs / seconds);
+    printf("measured %f reqs/s\n", (double)reqs / seconds);
     terminate();
 }
 

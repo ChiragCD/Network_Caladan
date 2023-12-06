@@ -112,7 +112,9 @@ static void client_worker(void *arg)
 
         t1.tv_sec = 0;
         t1.tv_nsec = 1000 * 1000 * 50;
-        nanosleep(&t1, &t2);
+        while(nanosleep(&t1, &t2)) {
+            t1.tv_nsec = t2.tv_nsec;
+        }
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);

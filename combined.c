@@ -70,9 +70,11 @@ static void client_worker(void *arg)
 		goto done;
 	}
     udp_set_nonblocking(c, true);
+    struct timespec t1, t2;
+    
 
 	while (microtime() < stop_us) {
-        ((uint64_t *)buf)[0] = 40;
+        ((uint64_t *)buf)[0] = 400;
         ((uint64_t *)buf)[1] = args->reqs;
 		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
@@ -91,6 +93,10 @@ static void client_worker(void *arg)
             uint64_t request_number = ((uint64_t *)buf)[1];
             args->ends[request_number] = microtime();
         }
+
+        t1.tv_sec = 0;
+        t1.tv_nsec = 1000 * 1000 * 50;
+        nanosleep(&t1, &t2);
 	}
 
 	printf("close port %hu\n", udp_local_addr(c).port);

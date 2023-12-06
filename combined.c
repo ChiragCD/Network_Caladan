@@ -42,8 +42,8 @@ static void client_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];
 	struct client_rr_args *args = (struct client_rr_args *)arg;
-    arg->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
-    arg->ends = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    args->ends = (uint64_t *) malloc(100000 * sizeof(uint64_t));
 	udpconn_t *c;
 	struct netaddr laddr;
 	ssize_t ret;
@@ -62,8 +62,8 @@ static void client_worker(void *arg)
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 40;
-        ((uint64_t *)buf)[1] = arg->reqs;
-		args->starts[arg->reqs] = microtime();
+        ((uint64_t *)buf)[1] = args->reqs;
+		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
         ret = udp_write(c, buf, payload_len);
         if (ret != payload_len) {

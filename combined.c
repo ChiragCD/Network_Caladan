@@ -97,7 +97,7 @@ static void client_worker(void *arg)
     args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     memset(args->starts, 0, 100000 * sizeof(uint64_t));
     struct timespec t1, t2;
-    ssize_t ret;
+    int ret;
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 400;
@@ -106,7 +106,7 @@ static void client_worker(void *arg)
 		args->reqs += 1;
         ret = udp_write(args->c, buf, payload_len);
         if (ret != -11 && (ret != payload_len)) {
-            printf("udp_write() failed, ret = %ld\n", ret);
+            printf("udp_write() failed, ret = %d\n", ret);
             break;
         }
 
@@ -136,7 +136,6 @@ static void do_client(void *arg)
 	stop_us = microtime() + seconds * ONE_SECOND;
     udpconn_t *c;
     struct netaddr laddr;
-    ssize_t ret;
 	for (i = 0; i < nworkers; i++) {
         if(i%2 == 0) {
             laddr.ip = 0;

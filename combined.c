@@ -71,6 +71,7 @@ static void client_worker(void *arg)
     memset(args->starts, 0, 100000 * sizeof(uint64_t));
     memset(args->ends, 0, 100000 * sizeof(uint64_t));
     struct timespec t1, t2;
+    ssize_t ret;
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 400;
@@ -125,7 +126,7 @@ static void do_client(void *arg)
         laddr.port = 0;
         if (udp_dial(laddr, raddr, &c)) {
             printf("udp_dial() failed, ret = %ld\n", ret);
-            goto done;
+            return;
         }
         arg_tbl[i].c = &c;
 		arg_tbl[i].wg = &wg;

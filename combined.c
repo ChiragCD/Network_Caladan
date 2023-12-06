@@ -150,6 +150,7 @@ static void do_client(void *arg)
         printf("udp_dial() failed, ret = %d\n", ret);
         return;
     }
+    laddr.port = udp_local_addr(c).port;
     arg_tbl[0].ends = (uint64_t **) malloc(nworkers * sizeof(uint64_t *));
     for(int i = 0; i < nworkers; i++) arg_tbl[0].ends[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     for(int i = 0; i < nworkers; i++) memset(arg_tbl[0].ends[i], 0, 100000 * sizeof(uint64_t));

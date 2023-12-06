@@ -45,10 +45,10 @@ struct client_rr_args {
 void terminate() {
     printf("\nTerminating\n");
     FILE * file = fopen("out", "w");
-    for(int i = 0; i < nworkers; i++) {
+    for(int i = 0; i < nworkers; i+=2) {
         for(int j = 0; j < arg_tbl[i].reqs; j++) {
             uint64_t start = arg_tbl[i].starts[j];
-            uint64_t end = arg_tbl[i].ends[j];
+            uint64_t end = arg_tbl[i+1].ends[j];
             uint64_t latency = 0;
             if(end) latency = end - start;
             fprintf(file, "%d %d %ld %ld %ld\n", i, j, start, end, latency);
@@ -62,28 +62,15 @@ void handle_interrupt(int signal) {
     terminate();
 }
 
-static void client_worker(void *arg)
-{
+static void client_receiver(void * arg) {
 	unsigned char buf[BUF_SIZE];
 	struct client_rr_args *args = (struct client_rr_args *)arg;
-    args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     args->ends = (uint64_t *) malloc(100000 * sizeof(uint64_t));
-    memset(args->starts, 0, 100000 * sizeof(uint64_t));
     memset(args->ends, 0, 100000 * sizeof(uint64_t));
     struct timespec t1, t2;
     ssize_t ret;
 
-	while (microtime() < stop_us) {
-        ((uint64_t *)buf)[0] = 400;
-        ((uint64_t *)buf)[1] = args->reqs;
-		args->starts[args->reqs] = microtime();
-		args->reqs += 1;
-        ret = udp_write(args->c, buf, payload_len);
-        if (ret != -11 && (ret != payload_len)) {
-            printf("udp_write() failed, ret = %ld\n", ret);
-            break;
-        }
-
+	while (microtime() < stop_us + 10000) {
 		ret = udp_read(args->c, buf, payload_len);
 		if (ret != -11 && (ret <= 0 || ret % payload_len != 0)) {
 			printf("udp_read() failed, ret = %ld\n", ret);
@@ -100,7 +87,35 @@ static void client_worker(void *arg)
 	}
 
 	printf("close port %hu\n", udp_local_addr(args->c).port);
-done:
+	waitgroup_done(args->wg);
+}
+
+static void client_worker(void *arg)
+{
+	unsigned char buf[BUF_SIZE];
+	struct client_rr_args *args = (struct client_rr_args *)arg;
+    args->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    memset(args->starts, 0, 100000 * sizeof(uint64_t));
+    struct timespec t1, t2;
+    ssize_t ret;
+
+	while (microtime() < stop_us) {
+        ((uint64_t *)buf)[0] = 400;
+        ((uint64_t *)buf)[1] = args->reqs;
+		args->starts[args->reqs] = microtime();
+		args->reqs += 1;
+        ret = udp_write(args->c, buf, payload_len);
+        if (ret != -11 && (ret != payload_len)) {
+            printf("udp_write() failed, ret = %ld\n", ret);
+            break;
+        }
+
+        t1.tv_sec = 0;
+        t1.tv_nsec = 1000 * 1000 * 50;
+        nanosleep(&t1, &t2);
+	}
+
+	printf("close port %hu\n", udp_local_addr(args->c).port);
 	waitgroup_done(args->wg);
 }
 
@@ -119,21 +134,24 @@ static void do_client(void *arg)
 	waitgroup_init(&wg);
 	waitgroup_add(&wg, nworkers);
 	stop_us = microtime() + seconds * ONE_SECOND;
+    udpconn_t *c;
+    struct netaddr laddr;
+    ssize_t ret;
 	for (i = 0; i < nworkers; i++) {
-        udpconn_t *c;
-        struct netaddr laddr;
-        laddr.ip = 0;
-        laddr.port = 0;
-        ssize_t ret;
-        if (ret = udp_dial(laddr, raddr, &c)) {
-            printf("udp_dial() failed, ret = %ld\n", ret);
-            return;
+        if(i%2 == 0) {
+            laddr.ip = 0;
+            laddr.port = 0;
+            if (ret = udp_dial(laddr, raddr, &c)) {
+                printf("udp_dial() failed, ret = %ld\n", ret);
+                return;
+            }
         }
         arg_tbl[i].c = c;
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
         arg_tbl[i].id = i;
-		ret = thread_spawn(client_worker, &arg_tbl[i]);
+		if(i%2 == 0) ret = thread_spawn(client_worker, &arg_tbl[i]);
+        else ret = thread_spawn(client_receiver, &arg_tbl[i]);
 		BUG_ON(ret);
 	}
 

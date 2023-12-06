@@ -136,8 +136,9 @@ static void server_worker(struct udp_spawn_data * arg)
 	/* calculate pi and return it */
 		
 		uint64_t num_terms = *(uint64_t *)arg->buf;
-		double result = calc_pi(num_terms);
-		ssize_t ret = udp_send(&result, sizeof(double), arg->laddr, arg->raddr);
+        double pi = calc_pi(num_terms);
+		arg->buf[0] = *(uint64_t *)(&pi);
+		ssize_t ret = udp_send(&result, payload_len, arg->laddr, arg->raddr);
 }
 
 static void do_server(void *arg)

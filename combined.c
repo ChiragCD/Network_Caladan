@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <signal.h>
 
 /* #include <base/stddef.h> */
 #include <base/log.h>
@@ -38,6 +39,28 @@ struct client_rr_args {
 	uint64_t reqs;
 };
 
+void terminate() {
+    printf("\nTerminating\n");
+    exit(0);
+}
+
+void handle_interrupt(int signal) {
+    terminate();
+}
+
+static void client_receiver(void * arg) {
+
+	while (microtime() < stop_us + 10000) {
+		ssize_t ret = udp_read(c, buf, payload_len);
+        uint64_t request_number = ((uint64_t *)buf)[1];
+		args->ends[request_number] = microtime();
+		if (ret <= 0 || ret % payload_len != 0) {
+			printf("udp_read() failed, ret = %ld\n", ret);
+			break;
+		}
+	}
+}
+
 static void client_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];
@@ -59,6 +82,7 @@ static void client_worker(void *arg)
 		printf("udp_dial() failed, ret = %ld\n", ret);
 		goto done;
 	}
+    udp_set_nonblocking(c, true);
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 40;
@@ -183,6 +207,8 @@ static int str_to_long(const char *str, long *val)
 
 int main(int argc, char *argv[])
 {
+
+    signal(SIGINT, handle_interrupt);
 	int ret;
 	long tmp;
 	uint32_t addr;

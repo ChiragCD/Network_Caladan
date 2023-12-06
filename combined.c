@@ -39,6 +39,7 @@ struct client_rr_args {
     uint64_t * starts;
     uint64_t * ends;
 	uint64_t reqs;
+    udpconn_t * c;
 };
 
 void terminate() {
@@ -69,37 +70,20 @@ static void client_worker(void *arg)
     args->ends = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     memset(args->starts, 0, 100000 * sizeof(uint64_t));
     memset(args->ends, 0, 100000 * sizeof(uint64_t));
-	udpconn_t *c;
-	struct netaddr laddr;
-	ssize_t ret;
-
-	/* local IP + ephemeral port */
-	laddr.ip = 0;
-	laddr.port = 0;
-
-	memset(buf, 0xAB, payload_len);
-
-	ret = udp_dial(laddr, raddr, &c);
-	if (ret) {
-		printf("udp_dial() failed, ret = %ld\n", ret);
-		goto done;
-	}
-    udp_set_nonblocking(c, true);
     struct timespec t1, t2;
-    
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 400;
         ((uint64_t *)buf)[1] = args->reqs;
 		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
-        ret = udp_write(c, buf, payload_len);
+        ret = udp_write(args->c, buf, payload_len);
         if (ret != -11 && (ret != payload_len)) {
             printf("udp_write() failed, ret = %ld\n", ret);
             break;
         }
 
-		ret = udp_read(c, buf, payload_len);
+		ret = udp_read(args->c, buf, payload_len);
 		if (ret != -11 && (ret <= 0 || ret % payload_len != 0)) {
 			printf("udp_read() failed, ret = %ld\n", ret);
 			break;
@@ -114,9 +98,7 @@ static void client_worker(void *arg)
         nanosleep(&t1, &t2);
 	}
 
-	printf("close port %hu\n", udp_local_addr(c).port);
-	udp_shutdown(c);
-	udp_close(c);
+	printf("close port %hu\n", udp_local_addr(args->c).port);
 done:
 	waitgroup_done(args->wg);
 }
@@ -137,6 +119,15 @@ static void do_client(void *arg)
 	waitgroup_add(&wg, nworkers);
 	stop_us = microtime() + seconds * ONE_SECOND;
 	for (i = 0; i < nworkers; i++) {
+        udpconn_t *c;
+        struct netaddr laddr;
+        laddr.ip = 0;
+        laddr.port = 0;
+        if (udp_dial(laddr, raddr, &c)) {
+            printf("udp_dial() failed, ret = %ld\n", ret);
+            goto done;
+        }
+        arg_tbl[i].c = &c;
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
         arg_tbl[i].id = i;
@@ -149,6 +140,8 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++) {
         printf("%d made %ld reqs\n", i, arg_tbl[i].reqs);
         reqs += arg_tbl[i].reqs;
+        udp_shutdown(arg_tbl[i].c);
+        udp_close(arg_tbl[i].c);
     }
 
 	printf("measured %f reqs/s\n", (double)reqs / seconds);

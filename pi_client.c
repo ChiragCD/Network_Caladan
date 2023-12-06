@@ -1,13 +1,13 @@
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-
-#define BUF_LEN 100
-
+#include <signal.h>                                                                                                                                           
+#include <stdio.h>                                                                                                                                            
+#include <stdlib.h>                                                                                                                                           
+#include <stdint.h>                                                                                                                                           
+#include <unistd.h>                                                                                                                                           
+#include <sys/socket.h>                                                                                                                                       
+#include <arpa/inet.h>                                                                                                                                        
+                                                                                                                                                              
+#define BUF_LEN 100                                                                                                                                           
+                                                                                                                                                              
 int sock;
 
 void terminate() {
@@ -23,13 +23,12 @@ void handle_interrupt(int signal) {
 
 int main(int argc, char * argv[]) {
 
-    if (argc < 3) {
-        printf("Usage - <executable> <remote port> <num_terms>\n");
+    if (argc < 2) {
+        printf("Usage - <executable> <num_terms>\n");
         return 0;
     }
 
-    int remote_port = atoi(argv[1]);
-    uint64_t num_terms = (uint64_t) strtoull(argv[2], NULL, 0);
+    uint64_t num_terms = (uint64_t) strtoull(argv[1], NULL, 0);
 
     signal(SIGINT, handle_interrupt);
 
@@ -37,16 +36,17 @@ int main(int argc, char * argv[]) {
 
     struct sockaddr_in self_addr, remote_addr;
     remote_addr.sin_family = AF_INET;
-    inet_aton("127.0.0.1", &remote_addr.sin_addr);
-    remote_addr.sin_port = htons(remote_port);
+    inet_aton("10.10.1.2", &remote_addr.sin_addr);
+    remote_addr.sin_port = htons(8000); 
 
-    int buffer[BUF_LEN];
+    uint64_t buffer[BUF_LEN];
     buffer[0] = num_terms;
-    int size = sendto(sock, buffer, BUF_LEN*sizeof(int), 0, (struct sockaddr *) &remote_addr, sizeof(remote_addr));
+    buffer[3] = 5;
+    int size = sendto(sock, buffer, BUF_LEN*sizeof(uint64_t), 0, (struct sockaddr *) &remote_addr, sizeof(remote_addr));
 
     int remote_addr_len = 0;
-    size = recvfrom(sock, buffer, BUF_LEN*sizeof(int), 0, (struct sockaddr *) &remote_addr, &remote_addr_len);
-    printf("Received %.20f\n", ((double *) buffer)[0]);
+    size = recvfrom(sock, buffer, BUF_LEN*sizeof(uint64_t), 0, (struct sockaddr *) &remote_addr, &remote_addr_len);
+    //printf("Received %.20f\n", ((double *) buffer)[0]);
     terminate();
     return 0;
 }

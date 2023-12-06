@@ -30,6 +30,8 @@ struct client_rr_args {
 	waitgroup_t *wg;
 	uint64_t reqs;
     uint64_t id;
+    uint64_t * starts;
+    uint64_t * diffs;
 };
 
 static void client_worker(void *arg)
@@ -39,6 +41,9 @@ static void client_worker(void *arg)
 	udpconn_t *c;
 	struct netaddr laddr;
 	ssize_t ret;
+
+    args->starts = (uint64_t *) malloc(1000000 * sizeof(uint64_t));
+    args->diffs = (uint64_t *) malloc(1000000 * sizeof(uint64_t));
 
 	/* local IP + ephemeral port */
 	laddr.ip = 0;
@@ -54,14 +59,16 @@ static void client_worker(void *arg)
 
 	while (microtime() < stop_us) {
         ((uint64_t *)buf)[0] = 400;
-        ((uint64_t *)buf)[3] = args->id;
+        ((uint64_t *)buf)[3] = args->id + 3;
         ret = udp_write(c, buf, payload_len);
+        args->starts[args->reqs] = microtime();
         if (ret != payload_len) {
             printf("udp_write() failed, ret = %ld\n", ret);
             break;
         }
 
 		ret = udp_read(c, buf, payload_len * depth);
+        args->diffs[args->reqs] = microtime() - args->starts[args->reqs];
 		if (ret <= 0 || ret % payload_len != 0) {
 			printf("udp_read() failed, ret = %ld\n", ret);
 			break;
@@ -96,7 +103,7 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++) {
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
-		arg_tbl[i].id = id;
+		arg_tbl[i].id = i;
 		ret = thread_spawn(client_worker, &arg_tbl[i]);
 		BUG_ON(ret);
 	}
@@ -107,6 +114,14 @@ static void do_client(void *arg)
 		reqs += arg_tbl[i].reqs;
 
 	printf("measured %f reqs/s\n", (double)reqs / seconds);
+
+    FILE * f = fopen("out", "w");
+    for(int i = 0; i < nworkers; i++) {
+        for(int j = 0; j < arg_tbl[i].reqs; j++) {
+            fprintf(f, "%d %lu %lu\n", i, arg_tbl[i].starts[j], arg_tbl[i].diffs[j]);
+        }
+    }
+    fclose(f);
 }
 
 double calc_pi(uint64_t num_terms) {

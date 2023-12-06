@@ -5,7 +5,7 @@
 #include <unistd.h>                                                                                                                                           
 #include <sys/socket.h>                                                                                                                                       
 #include <arpa/inet.h>   
-#include <time.h>                                                                                                                                     
+#include <time.h>                                                                                                                     
                                                                                                                                                               
 #define BUF_LEN 100                                                                                                                                           
                                                                                                                                                               
@@ -41,7 +41,8 @@ int main(int argc, char * argv[]) {
     remote_addr.sin_port = htons(8000); 
 
     uint64_t buffer[BUF_LEN];
-    int priority = 5;
+    srand(time(NULL));
+    int priority = (rand()%8) + 1;
     buffer[0] = num_terms;
     buffer[3] = priority;
     struct timeval t1, t2;
@@ -54,7 +55,7 @@ int main(int argc, char * argv[]) {
 
     unsigned long time1 = t1.tv_sec * 1000000 + t1.tv_usec;
     unsigned long time2 = t2.tv_sec * 1000000 + t2.tv_usec;
-    printf("%d %lu %lu\n", priority, time1, time2);
+    printf("%d %lu %lu\n", priority, time1, time2 - time1);
     terminate();
     return 0;
 }

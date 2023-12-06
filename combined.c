@@ -33,8 +33,8 @@ pthread_mutex_t server_lock;
 struct client_rr_args {
     int id;
 	waitgroup_t *wg;
-    static uint64_t * starts;
-    static uint64_t * ends;
+    uint64_t * starts;
+    uint64_t * ends;
 	uint64_t reqs;
 };
 
@@ -238,11 +238,6 @@ int main(int argc, char *argv[])
 		return -EINVAL;
 	}
 	depth = tmp;
-
-    starts = (uint64_t **) malloc(numthreads * sizeof(uint64_t *));
-    ends = (uint64_t **) malloc(numthreads * sizeof(uint64_t *));
-    for(int i = 0; i < numthreads; i++) starts[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
-    for(int i = 0; i < numthreads; i++) ends[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
 
 	ret = runtime_init(argv[1], fn, NULL);
 	if (ret) {

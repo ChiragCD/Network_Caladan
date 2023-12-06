@@ -40,6 +40,7 @@ struct client_rr_args {
     uint64_t ** ends;
 	uint64_t reqs;
     udpconn_t * c;
+    struct netaddr laddr;
 };
 
 void terminate() {
@@ -104,7 +105,8 @@ static void client_worker(void *arg)
         ((uint64_t *)buf)[3] = args->id;
 		args->starts[args->reqs] = microtime();
 		args->reqs += 1;
-        ret = udp_write(args->c, buf, payload_len);
+        ret = udp_send(buf, payload_len, args->laddr, raddr);
+        // ret = udp_write(args->c, buf, payload_len);
         if (ret != -11 && (ret != payload_len)) {
             printf("udp_write() failed, ret = %d\n", ret);
             break;
@@ -145,12 +147,18 @@ static void do_client(void *arg)
     udpconn_t *c;
     struct netaddr laddr;
     laddr.ip = 0;
-    laddr.port = 0;
-    if (ret = udp_dial(laddr, raddr, &c)) {
-        printf("udp_dial() failed, ret = %d\n", ret);
-        return;
-    }
-    laddr.port = udp_local_addr(c).port;
+    laddr.port = NETPERF_PORT;
+    // if (ret = udp_dial(laddr, raddr, &c)) {
+    //     printf("udp_dial() failed, ret = %d\n", ret);
+    //     return;
+    // }
+    // laddr.port = udp_local_addr(c).port;
+
+	udpspawner_t * spawner;
+
+    ret = udp_create_spawner(laddr, par_client_receiver, &spawner);
+    BUG_ON(ret);
+
     arg_tbl[0].ends = (uint64_t **) malloc(nworkers * sizeof(uint64_t *));
     for(int i = 0; i < nworkers; i++) arg_tbl[0].ends[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
     for(int i = 0; i < nworkers; i++) memset(arg_tbl[0].ends[i], 0, 100000 * sizeof(uint64_t));
@@ -159,6 +167,7 @@ static void do_client(void *arg)
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
         arg_tbl[i].id = i;
+        arg_tbl[i].l = laddr;
 		if(i) {
             ret = thread_spawn(client_worker, &arg_tbl[i]);
         }
@@ -167,11 +176,6 @@ static void do_client(void *arg)
         }
 		BUG_ON(ret);
 	}
-
-	udpspawner_t * spawner;
-
-    ret = udp_create_spawner(laddr, par_client_receiver, &spawner);
-    BUG_ON(ret);
 
 	waitgroup_wait(&wg);
     udp_shutdown(arg_tbl[0].c);
@@ -205,6 +209,7 @@ static void server_worker(struct udp_spawn_data * arg)
     double pi = calc_pi(num_terms);
     ((uint64_t *)arg->buf)[0] = *(uint64_t *)(&pi);
     ((uint64_t *)arg->buf)[3] = 0;
+    arg->raddr.port = NETPERF_PORT;
     ssize_t ret = udp_send(arg->buf, payload_len, arg->laddr, arg->raddr);
 }
 

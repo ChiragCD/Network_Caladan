@@ -14,6 +14,8 @@
 #include <runtime/sync.h>
 #include <runtime/udp.h>
 
+#include <pthread.h>
+
 #define NETPERF_PORT	8000
 
 /* experiment parameters */
@@ -24,10 +26,15 @@ static uint64_t stop_us;
 static size_t payload_len;
 static int depth;
 
+pthread_mutex_t server_lock;
+
 #define BUF_SIZE	32768
 
 struct client_rr_args {
+    int id;
 	waitgroup_t *wg;
+    static uint64_t * starts;
+    static uint64_t * ends;
 	uint64_t reqs;
 };
 
@@ -35,10 +42,11 @@ static void client_worker(void *arg)
 {
 	unsigned char buf[BUF_SIZE];
 	struct client_rr_args *args = (struct client_rr_args *)arg;
+    arg->starts = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    arg->ends = (uint64_t *) malloc(100000 * sizeof(uint64_t));
 	udpconn_t *c;
 	struct netaddr laddr;
 	ssize_t ret;
-	int budget = depth;
 
 	/* local IP + ephemeral port */
 	laddr.ip = 0;
@@ -48,32 +56,31 @@ static void client_worker(void *arg)
 
 	ret = udp_dial(laddr, raddr, &c);
 	if (ret) {
-		log_err("udp_dial() failed, ret = %ld", ret);
+		printf("udp_dial() failed, ret = %ld\n", ret);
 		goto done;
 	}
 
 	while (microtime() < stop_us) {
-		while (budget) {
-			((uint64_t *)buf)[0] = 40;
-			ret = udp_write(c, buf, payload_len);
-			if (ret != payload_len) {
-				log_err("udp_write() failed, ret = %ld", ret);
-				break;
-			}
-			budget--;
-		}
+        ((uint64_t *)buf)[0] = 40;
+        ((uint64_t *)buf)[1] = arg->reqs;
+		args->starts[arg->reqs] = microtime();
+		args->reqs += 1;
+        ret = udp_write(c, buf, payload_len);
+        if (ret != payload_len) {
+            printf("udp_write() failed, ret = %ld\n", ret);
+            break;
+        }
 
-		ret = udp_read(c, buf, payload_len * depth);
+		ret = udp_read(c, buf, payload_len);
+        uint64_t request_number = ((uint64_t *)buf)[1];
+		args->ends[request_number] = microtime();
 		if (ret <= 0 || ret % payload_len != 0) {
-			log_err("udp_read() failed, ret = %ld", ret);
+			printf("udp_read() failed, ret = %ld\n", ret);
 			break;
 		}
-
-		budget += ret / payload_len;
-		args->reqs += ret / payload_len;
 	}
 
-	log_info("close port %hu", udp_local_addr(c).port);
+	printf("close port %hu\n", udp_local_addr(c).port);
 	udp_shutdown(c);
 	udp_close(c);
 done:
@@ -87,7 +94,7 @@ static void do_client(void *arg)
 	int i, ret;
 	uint64_t reqs = 0;
 
-	log_info("client-mode UDP: %d workers, %ld bytes, %d seconds %d depth",
+	printf("client-mode UDP: %d workers, %ld bytes, %d seconds %d depth\n",
 		 nworkers, payload_len, seconds, depth);
 
 	arg_tbl = calloc(nworkers, sizeof(*arg_tbl));
@@ -99,6 +106,7 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++) {
 		arg_tbl[i].wg = &wg;
 		arg_tbl[i].reqs = 0;
+        arg_tbl[i].id = i;
 		ret = thread_spawn(client_worker, &arg_tbl[i]);
 		BUG_ON(ret);
 	}
@@ -108,7 +116,7 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++)
 		reqs += arg_tbl[i].reqs;
 
-	log_info("measured %f reqs/s", (double)reqs / seconds);
+	printf("measured %f reqs/s\n", (double)reqs / seconds);
 }
 
 double calc_pi(uint64_t num_terms) {
@@ -142,9 +150,11 @@ static void do_server(void *arg)
 
 	udpspawner_t * spawner;
 
-		ret = udp_create_spawner(laddr, server_worker, &spawner);
-		BUG_ON(ret);
-	while(1);
+    ret = udp_create_spawner(laddr, server_worker, &spawner);
+    BUG_ON(ret);
+
+    // Block forever
+    pthread_mutex_lock(&server_lock);
 }
 
 static int str_to_ip(const char *str, uint32_t *addr)
@@ -175,6 +185,8 @@ int main(int argc, char *argv[])
 	long tmp;
 	uint32_t addr;
 	thread_fn_t fn;
+
+    pthread_mutex_lock(&server_lock);
 
 	if (argc < 8) {
 		printf("%s: [config_file_path] [mode] [nworkers] [ip] [time] "
@@ -226,6 +238,11 @@ int main(int argc, char *argv[])
 		return -EINVAL;
 	}
 	depth = tmp;
+
+    starts = (uint64_t **) malloc(numthreads * sizeof(uint64_t *));
+    ends = (uint64_t **) malloc(numthreads * sizeof(uint64_t *));
+    for(int i = 0; i < numthreads; i++) starts[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
+    for(int i = 0; i < numthreads; i++) ends[i] = (uint64_t *) malloc(100000 * sizeof(uint64_t));
 
 	ret = runtime_init(argv[1], fn, NULL);
 	if (ret) {

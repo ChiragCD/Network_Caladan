@@ -141,7 +141,7 @@ static void do_client(void *arg)
             laddr.ip = 0;
             laddr.port = 0;
             if (ret = udp_dial(laddr, raddr, &c)) {
-                printf("udp_dial() failed, ret = %ld\n", ret);
+                printf("udp_dial() failed, ret = %d\n", ret);
                 return;
             }
         }
@@ -159,8 +159,10 @@ static void do_client(void *arg)
 	for (i = 0; i < nworkers; i++) {
         printf("%d made %ld reqs\n", i, arg_tbl[i].reqs);
         reqs += arg_tbl[i].reqs;
-        udp_shutdown(arg_tbl[i].c);
-        udp_close(arg_tbl[i].c);
+        if(i%2 == 0) {
+            udp_shutdown(arg_tbl[i].c);
+            udp_close(arg_tbl[i].c);
+        }
     }
 
 	printf("measured %f reqs/s\n", (double)reqs / seconds);

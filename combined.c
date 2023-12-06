@@ -124,7 +124,8 @@ static void do_client(void *arg)
         struct netaddr laddr;
         laddr.ip = 0;
         laddr.port = 0;
-        if (ssize_t ret = udp_dial(laddr, raddr, &c)) {
+        ssize_t ret;
+        if (ret = udp_dial(laddr, raddr, &c)) {
             printf("udp_dial() failed, ret = %ld\n", ret);
             return;
         }

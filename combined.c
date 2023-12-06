@@ -113,8 +113,10 @@ static void do_client(void *arg)
 
 	waitgroup_wait(&wg);
 
-	for (i = 0; i < nworkers; i++)
-		reqs += arg_tbl[i].reqs;
+	for (i = 0; i < nworkers; i++) {
+        printf("%d made %d reqs\n", i, arg_tbl[i].reqs);
+        reqs += arg_tbl[i].reqs;
+    }
 
 	printf("measured %f reqs/s\n", (double)reqs / seconds);
 }

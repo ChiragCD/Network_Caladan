@@ -121,6 +121,12 @@ static void client_worker(void *arg)
 	waitgroup_done(args->wg);
 }
 
+void par_client_receiver(struct udp_spawn_data * arg) {
+    uint64_t request_number = ((uint64_t *)arg->buf)[1];
+    uint64_t id = ((uint64_t *)arg->buf)[2];
+    arg_tbl[0].ends[id][request_number] = microtime();
+}
+
 static void do_client(void *arg)
 {
 	waitgroup_t wg;
@@ -177,12 +183,6 @@ static void do_client(void *arg)
 
 	printf("measured %f reqs/s\n", (double)reqs / seconds);
     terminate();
-}
-
-void par_client_receiver(struct udp_spawn_data * arg) {
-    uint64_t request_number = ((uint64_t *)arg->buf)[1];
-    uint64_t id = ((uint64_t *)arg->buf)[2];
-    arg_tbl[0]->ends[id][request_number] = microtime();
 }
 
 double calc_pi(uint64_t num_terms) {
